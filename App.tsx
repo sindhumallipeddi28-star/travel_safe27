@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { TripList } from './components/TripList';
 import { TripForm } from './components/TripForm';
 import { PlusIcon } from './components/icons/PlusIcon';
 import type { Trip } from './types';
-import { TravelMode, TripPurpose, TripFrequency } from './types';
+import { TravelMode, TripPurpose } from './types';
 import { TripFilter } from './components/TripFilter';
 
 interface FilterState {
@@ -15,37 +16,10 @@ interface FilterState {
 }
 
 const App: React.FC = () => {
-  const [trips, setTrips] = useState<Trip[]>([
-    {
-      id: '1',
-      tripNumber: 1,
-      origin: { lat: 12.9716, lon: 77.5946 },
-      startTime: new Date('2023-10-27T09:00:00').toISOString(),
-      destination: { lat: 12.9784, lon: 77.6408 },
-      endTime: new Date('2023-10-27T09:45:00').toISOString(),
-      mode: TravelMode.CAR,
-      distance: 8,
-      purpose: TripPurpose.WORK,
-      companions: 1,
-      frequency: TripFrequency.DAILY,
-      cost: 150,
-    },
-    {
-      id: '2',
-      tripNumber: 2,
-      origin: { lat: 12.9784, lon: 77.6408 },
-      startTime: new Date('2023-10-28T18:00:00').toISOString(),
-      destination: { lat: 12.9716, lon: 77.5946 },
-      endTime: new Date('2023-10-28T18:30:00').toISOString(),
-      mode: TravelMode.BUS,
-      distance: 8.5,
-      purpose: TripPurpose.SHOPPING,
-      companions: 0,
-      frequency: TripFrequency.OCCASIONALLY,
-      cost: 40,
-    }
-  ]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     mode: '',
     purpose: '',
@@ -53,42 +27,62 @@ const App: React.FC = () => {
     endDate: '',
   });
 
-  const handleSaveTrip = (newTripData: Omit<Trip, 'id' | 'tripNumber'>) => {
-    const newTrip: Trip = {
-      ...newTripData,
-      id: crypto.randomUUID(),
-      tripNumber: trips.length + 1,
-    };
-    setTrips(prevTrips => [...prevTrips, newTrip]);
-    setIsFormVisible(false);
-  };
+  const fetchTrips = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    const query = new URLSearchParams();
+    if (filters.mode) query.append('mode', filters.mode);
+    if (filters.purpose) query.append('purpose', filters.purpose);
+    if (filters.startDate) query.append('startDate', filters.startDate);
+    if (filters.endDate) query.append('endDate', filters.endDate);
 
-  const filteredTrips = useMemo(() => {
-    return trips.filter(trip => {
-      if (filters.mode && trip.mode !== filters.mode) {
-        return false;
+    try {
+      const response = await fetch(`/api/trips?${query.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch trips');
       }
-      if (filters.purpose && trip.purpose !== filters.purpose) {
-        return false;
-      }
-      const tripDate = new Date(trip.startTime);
-      if (filters.startDate) {
-        const startDate = new Date(filters.startDate);
-        startDate.setHours(0, 0, 0, 0);
-        if (tripDate < startDate) {
-          return false;
+      const data: Trip[] = await response.json();
+      setTrips(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    fetchTrips();
+  }, [fetchTrips]);
+
+  const handleSaveTrip = async (newTripData: Omit<Trip, 'id' | 'tripNumber'>) => {
+    try {
+      setError(null);
+      const response = await fetch('/api/trips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTripData),
+      });
+
+      if (!response.ok) {
+        if (response.status === 400) {
+          const errorData = await response.json();
+          const errorMessages = Object.values(errorData.errors || { general: 'Please check your input.' }).join(' ');
+          throw new Error(`${errorData.message || 'Validation failed'}: ${errorMessages}`);
         }
+        throw new Error('Failed to save trip to the server.');
       }
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(23, 59, 59, 999);
-        if (tripDate > endDate) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [trips, filters]);
+
+      await fetchTrips();
+      setIsFormVisible(false);
+    } catch (err) {
+       setError(err instanceof Error ? err.message : 'Could not save the trip. Please review your data.');
+       console.error(err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -97,14 +91,23 @@ const App: React.FC = () => {
         <TripFilter 
             filters={filters} 
             onFilterChange={setFilters} 
-            tripCount={filteredTrips.length}
+            tripCount={trips.length}
         />
-        <TripList trips={filteredTrips} />
+        {isLoading ? (
+            <div className="text-center py-20">Loading trips...</div>
+        ) : error && !isFormVisible ? ( // Only show main error when form is hidden
+            <div className="text-center py-20 text-red-500">{error}</div>
+        ) : (
+            <TripList trips={trips} />
+        )}
       </main>
       
       {!isFormVisible && (
         <button
-          onClick={() => setIsFormVisible(true)}
+          onClick={() => {
+            setIsFormVisible(true);
+            setError(null); // Clear error on form open
+          }}
           className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full p-4 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           aria-label="Add New Trip"
         >
@@ -115,7 +118,11 @@ const App: React.FC = () => {
       {isFormVisible && (
         <TripForm
           onSave={handleSaveTrip}
-          onCancel={() => setIsFormVisible(false)}
+          onCancel={() => {
+            setIsFormVisible(false);
+            setError(null); // Clear error on form cancel
+          }}
+          serverError={error}
         />
       )}
     </div>

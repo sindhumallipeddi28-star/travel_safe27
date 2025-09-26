@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Trip } from '../types';
 import { ClockIcon } from './icons/ClockIcon';
@@ -26,8 +25,11 @@ const InfoItem: React.FC<{ icon: React.ReactNode; label: string; value: string |
 
 
 export const TripCard: React.FC<TripCardProps> = ({ trip }) => {
+  const hasCompanions = trip.companions != null && Number(trip.companions) > 0;
+  const hasCost = trip.cost != null && Number(trip.cost) > 0;
+  
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden transition-shadow hover:shadow-lg">
+    <div className={`bg-white rounded-lg shadow-md overflow-hidden transition-shadow hover:shadow-lg ${hasCost ? 'border-l-4 border-amber-400' : ''}`}>
       <div className="p-5">
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-xl font-bold text-slate-800">Trip #{trip.tripNumber}</h3>
@@ -53,9 +55,17 @@ export const TripCard: React.FC<TripCardProps> = ({ trip }) => {
             <InfoItem icon={<ClockIcon />} label="End Time" value={new Date(trip.endTime).toLocaleString()} />
             <InfoItem icon={<RouteIcon />} label="Distance" value={`${trip.distance} km`} />
             <InfoItem icon={<TagIcon />} label="Purpose" value={trip.purpose} />
-            <InfoItem icon={<UsersIcon />} label="Companions" value={trip.companions} />
+            <InfoItem 
+                icon={<UsersIcon className={hasCompanions ? 'text-sky-600' : ''} />} 
+                label="Companions" 
+                value={trip.companions} 
+            />
             <InfoItem icon={<RepeatIcon />} label="Frequency" value={trip.frequency} />
-            <InfoItem icon={<CurrencyDollarIcon />} label="Cost" value={`₹${trip.cost}`} />
+            <InfoItem 
+                icon={<CurrencyDollarIcon className={hasCost ? 'text-amber-600' : ''} />}
+                label="Cost" 
+                value={`₹${trip.cost}`} 
+            />
         </div>
       </div>
     </div>
