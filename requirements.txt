@@ -1,2 +1,4 @@
-transformer
-torch
+
+streamlit
+pymongo
+python-dotenv

@@ -1,5 +1,4 @@
 {
   "name": "Copy of NATPAC Travel Diary",
-  "description": "A mobile-first web application to capture daily trip information for transportation planning. Users can log trip details such as origin, destination, mode of transport, and purpose, with an option to automatically detect their starting location.",
-  "requestFramePermissions": []
+  "description": "A mobile-first web application to capture daily trip information for transportation planning. Users can log trip details such as origin, destination, mode of transport, and purpose, with an option to automatically detect their starting location."
 }
